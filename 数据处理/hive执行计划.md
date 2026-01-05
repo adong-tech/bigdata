@@ -173,3 +173,12 @@ STAGE PLANS:
       Processor Tree：处理器树
       
       ListSink：数据展示。
+
+
+3.执行计划步骤操作过程
+可以根据上述执行计划通过流程图来描述一下hiveSQL的执行逻辑过程。
+<img width="1206" height="420" alt="image" src="https://github.com/user-attachments/assets/b6513b0e-2000-4d29-bc35-cc586633bdea" />
+
+
+
+通过上图可以很清晰的了解一个hiveSQL的执行逻辑过程，便于理解hive数据流转过程。
