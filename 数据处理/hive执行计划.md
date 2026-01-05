@@ -1,40 +1,63 @@
-参考：https://www.cnblogs.com/lubians/p/17461580.html#_label2-0
+目录
 
-1、Hive的执行计划：
-描述了一个hiveSQL语句的具体执行步骤，通过执行计划解读可以了解hiveSQL语句被解析器转换为相应程序语言的执行逻辑。通过执行逻辑可以知晓HiveSQL运行流程，进而对流程进行优化，实现更优的数据查询处理。
+概述
+1.hive执行计划的查看
+2.学会查看Hive执行计划的基本信息
+3.执行计划步骤操作过程
+4.explain extended
+ 
 
-2、执行计划生成：
-   a、基于规则生成hive执行计划
-   b、基于成本代价来生成执行计划（Hive0.14及之后）  
+反回顶部
+概述
+Hive的执行计划描述了一个hiveSQL语句的具体执行步骤，通过执行计划解读可以了解hiveSQL语句被解析器转换为相应程序语言的执行逻辑。通过执行逻辑可以知晓HiveSQL运行流程，进而对流程进行优化，实现更优的数据查询处理。
 
-3.hive执行计划的查看
+同样，通过执行计划，还可以了解到哪些不一样的SQL逻辑其实是等价的，哪些看似一样的逻辑其实是执行代价完全不一样。
+
+如果说Hive优化是一堵技术路上的高墙，那么关于Hive执行计划，就是爬上这堵高墙的一架梯子。
+
+不同版本的Hive会采用不同的方式生成的执行计划。主要区别就是基于规则生成hive执行计划，和基于成本代价来生成执行计划。而hive早期版本是基于规则生成执行计划，在Hive0.14及之后的版本都是基于成本代价来生成执行计划，这主要是集成了Apache Calcite。Apache Calcite具体可以查看官网介绍。
+
+两种方式的优劣显而易见，基于规则生成执行计划，作为使用方来说，集群的环境，数据量的大小完全不一样，同样的规则逻辑，执行起来差异巨大，因此会对开发者有更高的优化要求。Hive基于成本代价来生成执行计划，这种方式能够结合Hive元数据信息和Hive运行过程收集到的各类存储统计信息推测出一个更合理的执行计划。也就是说Hive本身已经为我们的SQL语句做了一轮优化了，可以预见的将来，Hive还会具备更多的优化能力。
+
+Hive执行计划是一个预估的执行计划，只有在SQL实际执行后才会获取到真正的执行计划，而一些关系型数据库中，会提供真实的SQL执行计划。如SQLserver和Oracle等。
+
+反回顶部
+1.hive执行计划的查看
 Hive提供的执行计划使用语法如下：
-EXPLAIN [EXTENDED|CBO|AST|DEPENDENCY|AUTHORIZATION|LOCKS|VECTORIZATION|ANALYZE] query
 
-EXPLAIN：    查看执行计划的基本信息；
-EXTENDED：   加上 extended 可以输出有关计划的额外扩展信息。这些通常是物理信息，例如文件名等；
-CBO：        可以选择使用Calcite优化器不同成本模型生成计划。CBO 从 hive 4.0.0 版本开始支持；
-AST：        输出查询的抽象语法树。AST 在hive 2.1.0 版本删除了，存在bug，转储AST可能会导致OOM错误，将在4.0.0版本修复；
-DEPENDENCY： dependency在EXPLAIN语句中使用会产生有关计划中输入的依赖信息。包含表和分区信息等；
+EXPLAIN [EXTENDED|CBO|AST|DEPENDENCY|AUTHORIZATION|LOCKS|VECTORIZATION|ANALYZE] query
+EXPLAIN：查看执行计划的基本信息；
+EXTENDED：加上 extended 可以输出有关计划的额外扩展信息。这些通常是物理信息，例如文件名等；
+CBO：可以选择使用Calcite优化器不同成本模型生成计划。CBO 从 hive 4.0.0 版本开始支持；
+AST：输出查询的抽象语法树。AST 在hive 2.1.0 版本删除了，存在bug，转储AST可能会导致OOM错误，将在4.0.0版本修复；
+DEPENDENCY：dependency在EXPLAIN语句中使用会产生有关计划中输入的依赖信息。包含表和分区信息等；
 AUTHORIZATION：显示SQL操作相关权限的信息；
-LOCKS：        这对于了解系统将获得哪些锁以运行指定的查询很有用。LOCKS 从 hive 3.2.0 开始支持；
+LOCKS：这对于了解系统将获得哪些锁以运行指定的查询很有用。LOCKS 从 hive 3.2.0 开始支持；
 VECTORIZATION：查看SQL的矢量化描述信息；
-ANALYZE：      用实际的行数注释计划。从 Hive 2.2.0 开始支持；
+ANALYZE：用实际的行数注释计划。从 Hive 2.2.0 开始支持；
 以上内容重点关注explain，explain extend，explain dependency，explain authorization，explain vectorization。
 
-4、查看Hive执行计划
--- 本文默认使用mr计算引擎-- 本文默认使用mr计算引擎
-===================================================================================================================================
+反回顶部
+2.学会查看Hive执行计划的基本信息
+一个HIVE查询被转换为一个由一个或多个stage组成的序列（有向无环图DAG）。这些stage可以是MapReduce stage，也可以是负责元数据存储的stage，也可以是负责文件系统的操作（比如移动和重命名）的stage。
+
+在查询SQL语句前加上关键字explain用来查看执行计划的基本信息。
+
+可以看如下实例的执行计划结果解析：
+
+实例SQL
+
+-- 本文默认使用mr计算引擎
 explain
 -- 统计年龄小于30岁各个年龄里，昵称里带“小”的人数
 select age,count(0) as num from temp.user_info_all where ymd = '20230505'
-and age < 30
- and nick like '%小%'
-group by age;
 
-===================================================================================================================================
-
+and age <  30
+ and nick like  '%小%' 
+group  by age;
+ 
 执行计划：
+
 # 描述任务之间stage的依赖关系
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
@@ -86,98 +109,96 @@ STAGE PLANS:
       limit: -1
       Processor Tree:
         ListSink
-======================================================================================================================================================================================================================================================================
-
 我们将上述结果拆分看，先从最外层开始，包含两个大的部分：
 
--- stage dependencies： 各个stage之间的依赖性
+stage dependencies： 各个stage之间的依赖性
 
--- stage plan： 各个stage的执行计划
+stage plan： 各个stage的执行计划
 
-'''先看第一部分 stage dependencies ，
-       包含两个 stage，Stage-1 是根stage，说明这是开始的stage，Stage-0 依赖 Stage-1，Stage-1执行完成后执行Stage-0。'''
+先看第一部分 stage dependencies ，包含两个 stage，Stage-1 是根stage，说明这是开始的stage，Stage-0 依赖 Stage-1，Stage-1执行完成后执行Stage-0。
 
-再看第二部分 
-      stage plan，里面有一个 Map Reduce，一个MR的执行计划分为两个部分：
+一些Hive执行逻辑的可视化工具页面就是利用该语句信息绘画出Hive执行流程图以及相关进度信息。
 
-      Map Operator Tree： MAP端的执行计划树
-      Reduce Operator Tree： Reduce端的执行计划树
-      这两个执行计划树里面包含这条sql语句的 operator：
-      
-      map端Map Operator Tree信息解读：
-      
-      TableScan 对关键字alias声明的结果集进行表扫描操作。
-      
-      alias： 表名称
-      
-      Statistics： 表统计信息，包含表中数据条数，数据大小等
-      
-      Filter Operator：过滤操作，表示在之前的表扫描结果集上进行数据过滤。
-      
-      predicate：过滤数据时使用的谓词（过滤条件），如sql语句中的and age < 30，则此处显示(age < 30)，什么是谓词，以及优化点，可以详细看之前一篇文章谓词下推。
-      
-      Statistics：过滤后数据条数和大小。
-      
-      Select Operator： 对列进行投影，即筛选列，选取操作。
-      
-      expressions：筛选的列名称及列类型
-      
-      outputColumnNames：输出的列名称
-      
-      Statistics：筛选列后表统计信息，包含表中数据条数，数据大小等。
-      
-      Group By Operator：分组聚合操作。
-      
-      aggregations：显示聚合函数信息，这里使用count(0)。
-      
-      keys：表示分组的列，如果没有分组，则没有此字段。
-      
-      mode：聚合模式，值有 hash：随机聚合；mergepartial：合并部分聚合结果；final：最终聚合
-      
-      outputColumnNames：聚合之后输出列名，_col0对应的是age列， _col1对应的是count(0)列。
-      
-      Statistics： 表统计信息，包含分组聚合之后的数据条数，数据大小。
-      
-      Reduce Output Operator：输出到reduce操作结果集信息。
-      
-      key expressions：MR计算引擎，在map和reduce阶段的输出都是key-value形式，这里描述的是map端输出的键使用的是哪个数据列。_col0对应的是age列。
-      
-      sort order：值为空不排序；值为 + 正序排序，值为 - 倒序排序；值为 +- 排序的列为两列，第一列为正序，第二列为倒序，以此类推多值排序。
-      
-      Map-reduce partition columns：表示Map阶段输出到Reduce阶段的分区列，在HiveSQL中，可以用distribute by指定分区的列。这里默认为_col0对应的是age列。
-      
-      Statistics：输出结果集的统计信息。
-      
-      value expressions：对应key expressions，这里是value值字段。_col1对应的是count(0)列。
-      
-      接下来是reduce阶段Reduce Operator Tree，出现和map阶段关键词一样的，其含义是一致的，罗列一下map阶段未出现的关键词。
-      
-      File Output Operator：文件输出操作。
-      
-      compressed：表示输出结果是否进行压缩，true压缩，false不压缩。
-      
-      table：表示当前操作表的信息。
-      
-      input format：输入文件类型。
-      
-      output format：输出文件类型。
-      
-      serde：读取表数据的序列化和反序列化方式。
-      
-      Stage-0的操作信息。
-      
-      Fetch Operator：客户端获取数据操作。
-      
-      limit：值为-1标识不限制条数，其他值为限制的条数。
-      
-      Processor Tree：处理器树
-      
-      ListSink：数据展示。
+再看第二部分 stage plan，里面有一个 Map Reduce，一个MR的执行计划分为两个部分：
+
+Map Operator Tree： MAP端的执行计划树
+Reduce Operator Tree： Reduce端的执行计划树
+这两个执行计划树里面包含这条sql语句的 operator：
+
+map端Map Operator Tree信息解读：
+
+TableScan 对关键字alias声明的结果集进行表扫描操作。
+
+alias： 表名称
+
+Statistics： 表统计信息，包含表中数据条数，数据大小等
+
+Filter Operator：过滤操作，表示在之前的表扫描结果集上进行数据过滤。
+
+predicate：过滤数据时使用的谓词（过滤条件），如sql语句中的and age < 30，则此处显示(age < 30)，什么是谓词，以及优化点，可以详细看之前一篇文章谓词下推。
+
+Statistics：过滤后数据条数和大小。
+
+Select Operator： 对列进行投影，即筛选列，选取操作。
+
+expressions：筛选的列名称及列类型
+
+outputColumnNames：输出的列名称
+
+Statistics：筛选列后表统计信息，包含表中数据条数，数据大小等。
+
+Group By Operator：分组聚合操作。
+
+aggregations：显示聚合函数信息，这里使用count(0)。
+
+keys：表示分组的列，如果没有分组，则没有此字段。
+
+mode：聚合模式，值有 hash：随机聚合；mergepartial：合并部分聚合结果；final：最终聚合
+
+outputColumnNames：聚合之后输出列名，_col0对应的是age列， _col1对应的是count(0)列。
+
+Statistics： 表统计信息，包含分组聚合之后的数据条数，数据大小。
+
+Reduce Output Operator：输出到reduce操作结果集信息。
+
+key expressions：MR计算引擎，在map和reduce阶段的输出都是key-value形式，这里描述的是map端输出的键使用的是哪个数据列。_col0对应的是age列。
+
+sort order：值为空不排序；值为 + 正序排序，值为 - 倒序排序；值为 +- 排序的列为两列，第一列为正序，第二列为倒序，以此类推多值排序。
+
+Map-reduce partition columns：表示Map阶段输出到Reduce阶段的分区列，在HiveSQL中，可以用distribute by指定分区的列。这里默认为_col0对应的是age列。
+
+Statistics：输出结果集的统计信息。
+
+value expressions：对应key expressions，这里是value值字段。_col1对应的是count(0)列。
+
+接下来是reduce阶段Reduce Operator Tree，出现和map阶段关键词一样的，其含义是一致的，罗列一下map阶段未出现的关键词。
+
+File Output Operator：文件输出操作。
+
+compressed：表示输出结果是否进行压缩，true压缩，false不压缩。
+
+table：表示当前操作表的信息。
+
+input format：输入文件类型。
+
+output format：输出文件类型。
+
+serde：读取表数据的序列化和反序列化方式。
+
+Stage-0的操作信息。
+
+Fetch Operator：客户端获取数据操作。
+
+limit：值为-1标识不限制条数，其他值为限制的条数。
+
+Processor Tree：处理器树
+
+ListSink：数据展示。
 
 
 3.执行计划步骤操作过程
-可以根据上述执行计划通过流程图来描述一下hiveSQL的执行逻辑过程。
-<img width="1206" height="420" alt="image" src="https://github.com/user-attachments/assets/b6513b0e-2000-4d29-bc35-cc586633bdea" />
+可以根据上述执行计划通过流程图来描述一下hiveSQL的执行逻辑过程。可以根据上述执行计划通过流程图来描述一下hiveSQL的执行逻辑过程。
+<img width="1050" height="379" alt="image" src="https://github.com/user-attachments/assets/ab7dbb6d-c308-40c1-9ab0-e25d63512277" />
 
 
 
