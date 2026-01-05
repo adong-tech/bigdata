@@ -1,1 +1,31 @@
+1、Hive的执行计划：
+描述了一个hiveSQL语句的具体执行步骤，通过执行计划解读可以了解hiveSQL语句被解析器转换为相应程序语言的执行逻辑。通过执行逻辑可以知晓HiveSQL运行流程，进而对流程进行优化，实现更优的数据查询处理。
+
+2、执行计划生成：
+   a、基于规则生成hive执行计划
+   b、基于成本代价来生成执行计划（Hive0.14及之后）  
+
+3.hive执行计划的查看
+Hive提供的执行计划使用语法如下：
+EXPLAIN [EXTENDED|CBO|AST|DEPENDENCY|AUTHORIZATION|LOCKS|VECTORIZATION|ANALYZE] query
+
+EXPLAIN：    查看执行计划的基本信息；
+EXTENDED：   加上 extended 可以输出有关计划的额外扩展信息。这些通常是物理信息，例如文件名等；
+CBO：        可以选择使用Calcite优化器不同成本模型生成计划。CBO 从 hive 4.0.0 版本开始支持；
+AST：        输出查询的抽象语法树。AST 在hive 2.1.0 版本删除了，存在bug，转储AST可能会导致OOM错误，将在4.0.0版本修复；
+DEPENDENCY： dependency在EXPLAIN语句中使用会产生有关计划中输入的依赖信息。包含表和分区信息等；
+AUTHORIZATION：显示SQL操作相关权限的信息；
+LOCKS：        这对于了解系统将获得哪些锁以运行指定的查询很有用。LOCKS 从 hive 3.2.0 开始支持；
+VECTORIZATION：查看SQL的矢量化描述信息；
+ANALYZE：      用实际的行数注释计划。从 Hive 2.2.0 开始支持；
+以上内容重点关注explain，explain extend，explain dependency，explain authorization，explain vectorization。
+
+4、查看Hive执行计划
+-- 本文默认使用mr计算引擎
+explain
+-- 统计年龄小于30岁各个年龄里，昵称里带“小”的人数
+select age,count(0) as num from temp.user_info_all where ymd = '20230505'
+and age < 30
+ and nick like '%小%'
+group by age;
 
